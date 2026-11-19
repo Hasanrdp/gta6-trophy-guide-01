@@ -1,8 +1,9 @@
-// A small static server for app/ (Node 22, standard library only), for trying the
-// guide locally without a build step: `node serve.ts` puts app/ on
-// http://localhost:8080 (pass --port <n> for another port). It answers with the MIME
-// type each file needs, refuses any path that escapes app/, and does nothing else:
-// a development convenience, not a server for the internet.
+// A tiny static server for app/ (Node 22, standard library only), so the
+// guide can be tried locally without a build step: `node serve.ts` serves
+// app/ on http://localhost:8080 (`--port <n>` for another port). It sends the
+// MIME types a browser needs, refuses any path outside app/, and otherwise
+// does nothing clever: this is a development convenience, not a web server
+// for the internet.
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
@@ -10,11 +11,11 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('./app', import.meta.url)));
 const args = process.argv.slice(2);
-const portArg = args.indexOf('--port');
-const wanted = portArg === -1 ? 8080 : Number(args[portArg + 1]);
-const port = Number.isInteger(wanted) && wanted > 0 && wanted < 65536 ? wanted : 8080;
+const portIndex = args.indexOf('--port');
+const requested = portIndex === -1 ? 8080 : Number(args[portIndex + 1]);
+const port = Number.isInteger(requested) && requested > 0 && requested < 65536 ? requested : 8080;
 
-const MIME_TYPES = {
+const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
@@ -55,7 +56,7 @@ createServer((request, response) => {
     return;
   }
   response.writeHead(200, {
-    'content-type': MIME_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
+    'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
     'content-length': size,
     'cache-control': 'no-store',
   });
