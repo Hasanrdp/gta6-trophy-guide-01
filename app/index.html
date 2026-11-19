@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leonida Trophy Atlas — GTA VI Trophy Guide &amp; Tracker</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-inner">
+    <div>
+      <p class="eyebrow">Grand Theft Auto VI · PlayStation 5 · fan-made, unofficial</p>
+      <h1>Leonida Trophy Atlas</h1>
+      <p class="tagline">Every one of the 55 trophies, with a guide in our own words, a roadmap to the platinum, and a tracker that remembers your progress.</p>
+    </div>
+    <div class="progress-card" id="progressCard">
+      <div class="progress-big"><span id="earnedCount">0</span><span class="of"> / 55 earned</span></div>
+      <div class="progress-bar" role="progressbar" aria-label="Trophies earned"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="grade-counts" id="gradeCounts"></div>
+      <p class="progress-note" id="progressNote">Tick a trophy to save it in this browser.</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="alert" id="missableAlert">
+    <strong>⚠ One trophy can be missed: Positive Mental Attitude.</strong>
+    <span>After the Chapter 1 mission <em>Down to Earth</em>, talk to Lucia in the kitchen in the morning, follow her to the balcony and choose <em>Accept</em>. That meditation is gone after Chapter 1. Keep a manual save from the start of the chapter. <a href="#trophy-28">Jump to its guide ↓</a></span>
+  </section>
+
+  <section class="panel" id="roadmapPanel">
+    <h2>Roadmap to the platinum</h2>
+    <p class="panel-sub">About 200 hours, difficulty 4/10, one playthrough, no online trophies. No mission replay and no New Game Plus — keep a manual save at the start and end of every chapter (15 manual slots, 1 autosave). Leave cheats off: they switch off trophies and saving.</p>
+    <div class="roadmap" id="roadmap"></div>
+  </section>
+
+  <section class="panel controls" id="controlsPanel">
+    <h2>Find a trophy</h2>
+    <div class="control-row">
+      <label class="search-label">Search <input id="search" type="search" placeholder="Name, mission, place…" autocomplete="off"></label>
+      <label>Grade
+        <select id="gradeFilter">
+          <option value="all">All grades</option>
+          <option value="platinum">Platinum</option>
+          <option value="gold">Gold</option>
+          <option value="silver">Silver</option>
+          <option value="bronze">Bronze</option>
+        </select>
+      </label>
+      <label>Status
+        <select id="statusFilter">
+          <option value="all">All trophies</option>
+          <option value="earned">Earned only</option>
+          <option value="remaining">Still to earn</option>
+        </select>
+      </label>
+      <label class="check-label"><input id="missableOnly" type="checkbox"> Missable only</label>
+      <label class="check-label spoiler-label"><input id="spoilerGuard" type="checkbox"> Spoiler Guard — hide story trophies until earned</label>
+    </div>
+    <div class="kind-chips" id="kindChips" role="group" aria-label="Filter by kind"></div>
+    <div class="control-row actions-row">
+      <button id="exportBtn" type="button">Export progress</button>
+      <label class="import-btn">Import progress <input id="importFile" type="file" accept="application/json,.json"></label>
+      <button id="resetBtn" type="button" class="danger">Reset progress</button>
+      <span class="showing" id="showingCount"></span>
+    </div>
+  </section>
+
+  <section id="trophyList" aria-live="polite"></section>
+
+  <section class="panel" id="sourcesPanel">
+    <h2>Sources &amp; notes</h2>
+    <p>Every guide above is written in our own words for this atlas. The facts come from the sources below — a source is cited, never copied. Trophy names, descriptions and grades are shown exactly as PlayStation publishes them; the list is frozen as of 18 November 2026.</p>
+    <ul class="source-list" id="sourceList"></ul>
+    <ul class="notes-list" id="notesList"></ul>
+    <p class="fineprint">Fan-made guide. Grand Theft Auto, GTA and Rockstar Games are trademarks of their owners; this atlas uses no Rockstar logo, artwork or game screenshot. The trophy list and the guides may change as the community confirms the last few unlocks — the five trophies marked unconfirmed say so in their guides.</p>
+  </section>
+</main>
+
+<footer>
+  <p>Leonida Trophy Atlas — an offline guide. Your ticks are saved in this browser only (localStorage) and never leave your machine.</p>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
