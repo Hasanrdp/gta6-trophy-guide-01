@@ -1,90 +1,66 @@
-[![make.fun](https://make.fun/badge/gta6-trophy-guide-01.svg)](https://make.fun/bounty/gta6-trophy-guide-01)
-[![Rank](https://make.fun/badge/gta6-trophy-guide-01/Hasanrdp/gta6-trophy-guide-01/rank.svg)](https://make.fun/bounty/gta6-trophy-guide-01)
-[![Reward](https://make.fun/badge/gta6-trophy-guide-01/Hasanrdp/gta6-trophy-guide-01/reward.svg)](https://make.fun/bounty/gta6-trophy-guide-01)
-
 # Leonida Platinum — GTA 6 Trophy Guide & Tracker
 
-An offline web app that guides and tracks all **55 Grand Theft Auto VI trophies** on PlayStation 5:
-1 platinum, 2 gold, 6 silver, 46 bronze — 28 of them hidden until earned.
-A checklist saved in your browser, a 5-stage roadmap to the platinum, the one
-missable trophy flagged, a next-up planner, and a cited guide for every trophy.
-It runs entirely from its own files with the network off.
+![competition](https://make.fun/badge/gta6-trophy-guide-01.svg)
+![rank](https://make.fun/badge/gta6-trophy-guide-01/Hasanrdp/gta6-trophy-guide-01/rank.svg)
+![reward](https://make.fun/badge/gta6-trophy-guide-01/Hasanrdp/gta6-trophy-guide-01/reward.svg)
+
+A free, open-source, offline guide and tracker for all 55 PlayStation 5
+trophies of Grand Theft Auto VI. Built for the
+[make.fun bounty](https://make.fun/bounty/gta6-trophy-guide-01).
 
 ## What it does
 
-- **Tracker** — all 55 trophies with official name, description and grade, a
-  progress bar ("X of 55 earned"), per-grade counts, PSN targets (e.g. 0/42),
-  checkboxes saved in localStorage, medal swatches, kind and grade filters,
-  search, a spoiler toggle that hides hidden trophies' names and descriptions
-  until earned, an earned-only toggle, export / import / reset, and free-text
-  notes per trophy.
-- **Roadmap** — five stages with hours and trophy lists: story first (60–80h),
-  side stories, activities & challenges, collectibles & exploration, then money,
-  robberies & cleanup into the 100% checklist and the platinum. Includes the
-  cheat warning (cheats disable trophies and saving) and the no-mission-replay
-  manual-save advice.
-- **Missables** — Positive Mental Attitude is the only missable trophy: the first
-  meditation spot, at Jason's house in Chapter 1, is permanently unavailable
-  after that chapter ends. Every other trophy is listed as safe, with the note
-  that no other missable is confirmed yet.
-- **Next-up planner** — the next unearned trophies in roadmap order.
-- **Guide detail** — per trophy: guide in our own words, steps, PSN target,
-  when it can be missed, and named sources with links.
+- **Every trophy, exact.** All 55 official trophies — 1 platinum, 2 gold,
+  6 silver, 46 bronze — with the official name, description and grade as
+  PlayStation publishes them.
+- **Tracker.** Check trophies off as you earn them. Progress is saved in
+  the browser (localStorage) and can be exported to a file and imported
+  back.
+- **Filters.** Filter by kind (story, side, collectible, activity,
+  challenge), by grade, by missable-only, or search by name.
+- **Spoiler setting.** Hides the names and descriptions of story trophies
+  until you earn them.
+- **Roadmap to the platinum.** Four stages in the order to play them, from
+  the story run to the final cleanup.
+- **Missables flagged.** The trophies tied to one-time moments or a
+  partner are flagged, with why they can be missed. The flags are built
+  from the official descriptions and are labelled as not yet verified
+  in-game.
+- **A guide for each trophy, in our own words, with its sources cited.**
+  Every guide names where its facts come from: the official list on
+  Exophase for the name, description and grade, PSNProfiles for PSN's
+  progress count where it has one, and our own advice from the official
+  description, not yet checked in the game. Nothing is copied from
+  other guides.
 
-## Method & sources
+## How to use it
 
-Official names, descriptions, grades and hidden flags are the PlayStation 5
-list as published by [Exophase](https://www.exophase.com/game/grand-theft-auto-vi-psn/trophies/)
-and [PSNProfiles](https://psnprofiles.com/trophies/43531-grand-theft-auto-vi)
-(the two agree on all 55), cross-checked for the hidden/visible split against
-[Planet GTA 6](https://www.planetgta6.com/en/gta-6-trophies/) and
-[GTA Zone](https://gta-zone.com/news/gta-6-trophies-achievements/).
-The roadmap and the 100% completion breakdown follow
-[PowerPyx](https://www.powerpyx.com/gta-6-grand-theft-auto-vi-trophy-guide-roadmap/):
-platinum difficulty 4/10, about 200 hours, 55 offline / 0 online, one playthrough,
-five story chapters of 60–80 hours, no mission replay, free-roam after the story.
-
-Every guide is written in our own words for this entry and cites its sources
-beside each trophy. Where no verified method exists yet — five trophies
-(In The Beginning…, Capital Offense, Bad Luck, I Guess, The Truth Is Out There,
-Ten Pin) — the guide says so honestly instead of inventing steps.
-
-No Rockstar Games logo or official artwork is used anywhere; the look is our own.
-
-## How to run
+Serve the `app/` directory with any static file server and open
+`app/index.html` in a desktop browser. It works with the network off:
+every file it loads lives under `app/`. Or open `app/index.html`
+directly from the files.
 
 ```sh
-node serve.ts        # serves app/ at http://localhost:8080
+cd app && python3 -m http.server 8000
+# open http://localhost:8000/
 ```
 
-Or open `app/index.html` through any static file server with `app/` at its root.
-Views take URL parameters: `?view=checklist|roadmap|missables|nextup|guide`,
-`?view=guide&id=17` opens one trophy's guide, and `?demo=1` seeds a fixed
-13 earned trophies (in memory only, for screenshots).
+## How it is built
 
-## Files
+`main.ts` (Node 22) copies `app/` and `screenshots/` to the output
+directory and writes `dossier.json` with the kit's
+`vendor/makefun-frontend.ts` dossier library. The dossier is the
+byte-for-byte output of that library from the same files.
 
-| Path | What it is |
-| --- | --- |
-| `main.ts` | Entrypoint: copies `app/` + `screenshots/` to `/output`, writes `dossier.json` |
-| `serve.ts` | Tiny static server for local testing (port 8080) |
-| `vendor/makefun-frontend.ts` | The kit's dossier library, byte-identical |
-| `app/index.html` | The guide's single page |
-| `app/style.css` | Paper + night themes, coral accent |
-| `app/js/main.js` | Boot, routing, wiring |
-| `app/js/store.js` | localStorage progress, export / import / reset |
-| `app/js/filters.js` | Kind / grade / search / spoiler filtering |
-| `app/js/views.js` | Checklist, roadmap, missables, next-up, guide detail |
-| `app/data/trophies.json` | All 55 official trophies with guides, steps and sources |
-| `screenshots/` | Four real renders of the app (1280×800 JPEG) |
-| `LICENSE` | MIT |
+## Sources
 
-## Local validation
+- Official trophy list (names, descriptions, grades):
+  Exophase, Grand Theft Auto VI trophies for PS5.
+- PSN progress targets: PSNProfiles, Grand Theft Auto VI trophies.
+- Guides: our own words from the official descriptions. Where a place
+  or a step is not pinned down by the official description, the guide
+  says so plainly instead of inventing it.
 
-- `node main.ts` twice to two output dirs: dossier bytes identical (deterministic).
-- `node <kit>/cli/makefun.mjs check --kit <kit> --repo .` — passes (LICENSE,
-  entrypoint, size caps).
-- Trophy data check: all 55 official names present, each with a non-blank guide,
-  grades 1 platinum / 2 gold / 6 silver / 46 bronze, 28 hidden.
-- `owner.json` and `.makefun/owner.json` are each exactly 58 bytes.
-- Screenshots: 4 files, each under 256 KiB, 1280×800.
+## License
+
+MIT. See [LICENSE](LICENSE).
