@@ -1,6 +1,9 @@
-// Trophy filters — one job: decide which trophies a view shows, from the toolbar state.
-// Kind names match the kinds carried in data/trophies.json; "exploration" groups the
-// collectible and exploration-flavoured kinds, and "missable" is a flag, not a kind.
+// filters.js — how the checklist is narrowed, and the spoiler rule.
+//
+// Kinds come from the trophy data itself. "Exploration" is a view over the
+// collectible trophies (cards, WAiNK spots, vehicles, areas, garages, Scooter
+// Bros), since those are the ones earned by exploring Leonida. "Missable" is
+// its own filter: only the trophies flagged possible.
 
 export const KIND_LABELS = {
   story: 'Story',
@@ -10,60 +13,54 @@ export const KIND_LABELS = {
   money: 'Money',
   social: 'Social',
   platinum: 'Platinum',
-  completion: 'Completion',
+  completion: '100% completion',
 };
 
-export function kindLabel(kind) {
-  return KIND_LABELS[kind] || kind;
+export const GRADE_LABELS = {
+  platinum: 'Platinum',
+  gold: 'Gold',
+  silver: 'Silver',
+  bronze: 'Bronze',
+};
+
+// The 13-trophy demo seed plus the spoiler rule: a hidden trophy keeps its
+// name and description masked until it is earned.
+export function isSpoilerHidden(trophy, state) {
+  return state.settings.spoilers && trophy.hidden && !state.earned.includes(trophy.id);
 }
 
-export function gradeLetter(grade) {
-  return { platinum: 'P', gold: 'G', silver: 'S', bronze: 'B' }[grade] || '?';
+export function filterTrophies(trophies, state) {
+  const { kind, grade, search, earnedOnly } = state.settings;
+  const needle = search.trim().toLowerCase();
+  return trophies.filter((trophy) => {
+    if (earnedOnly && !state.earned.includes(trophy.id)) return false;
+    if (grade !== 'all' && trophy.grade !== grade) return false;
+    if (kind === 'missable' && trophy.missable !== 'possible') return false;
+    else if (kind === 'exploration' && trophy.kind !== 'collectibles') return false;
+    else if (kind !== 'all' && kind !== 'missable' && kind !== 'exploration' && trophy.kind !== kind) return false;
+    if (needle) {
+      const hay = `${trophy.name} ${trophy.description}`.toLowerCase();
+      if (!hay.includes(needle)) return false;
+    }
+    return true;
+  });
 }
 
-// A trophy counts as "exploration" when it is about finding places or things.
-export function matchesKindFilter(trophy, kindFilter) {
-  if (kindFilter === 'all') return true;
-  if (kindFilter === 'missable') return trophy.missable && trophy.missable !== 'no';
-  if (kindFilter === 'exploration') {
-    return trophy.kind === 'collectibles' || trophy.id === 42;
+export function gradeCounts(trophies, state) {
+  const out = { platinum: [0, 0], gold: [0, 0], silver: [0, 0], bronze: [0, 0] };
+  for (const trophy of trophies) {
+    out[trophy.grade][1] += 1;
+    if (state.earned.includes(trophy.id)) out[trophy.grade][0] += 1;
   }
-  return trophy.kind === kindFilter;
+  return out;
 }
 
-export function matchesGradeFilter(trophy, gradeFilter) {
-  return gradeFilter === 'all' || trophy.grade === gradeFilter;
+export function stageTrophies(trophies, stage) {
+  return trophies.filter((trophy) => trophy.stage === stage).sort((a, b) => a.id - b.id);
 }
 
-export function matchesSearch(trophy, query) {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return trophy.name.toLowerCase().includes(q) || trophy.description.toLowerCase().includes(q);
-}
-
-export function matchesEarnedOnly(trophy, earnedOnly, progress) {
-  if (!earnedOnly) return true;
-  return progress.earned.includes(trophy.id);
-}
-
-export function applyChecklistFilters(trophies, filters, progress) {
-  return trophies.filter(
-    (t) =>
-      matchesKindFilter(t, filters.kind) &&
-      matchesGradeFilter(t, filters.grade) &&
-      matchesSearch(t, filters.query) &&
-      matchesEarnedOnly(t, filters.earnedOnly, progress),
-  );
-}
-
-// Roadmap order: stage first, then the trophy's id inside its stage.
-export function sortByRoadmap(trophies) {
-  return [...trophies].sort((a, b) => a.stage - b.stage || a.id - b.id);
-}
-
-// The next-up planner: the earliest unearned trophies in roadmap order.
-export function nextUpTrophies(trophies, progress, count = 8) {
-  return sortByRoadmap(trophies)
-    .filter((t) => !progress.earned.includes(t.id))
-    .slice(0, count);
+export function nextUpTrophies(trophies, state, limit = 10) {
+  const unearned = trophies.filter((trophy) => !state.earned.includes(trophy.id));
+  unearned.sort((a, b) => a.stage - b.stage || a.id - b.id);
+  return unearned.slice(0, limit);
 }
