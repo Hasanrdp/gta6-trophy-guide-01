@@ -1,184 +1,249 @@
-// Main — one job: start the app, wire the toolbar and tabs, and re-render on every change.
-// The app fetches only its own data/trophies.json and keeps progress in localStorage.
+// main.js — boot, routing and wiring for Leonida Platinum.
+//
+// The page is one static file plus its own data: it fetches only
+// ./data/trophies.json, its own file, and makes no other network request.
+// Views switch on ?view= (checklist | roadmap | missables | nextup | guide),
+// a guide opens on ?view=guide&id=N, and ?demo=1 seeds a fixed 13 earned
+// trophies in memory only, for screenshots.
 
-import { loadProgress, saveProgress, toggleEarned, setNote, seedDemoProgress, resetProgress, exportProgressFile, parseImportedProgress } from './store.js';
-import { renderChecklist, renderRoadmap, renderMissables, renderNextUp, renderGuide } from './views.js';
+import {
+  loadState,
+  saveState,
+  hasSavedState,
+  toggleEarned,
+  setNote,
+  exportState,
+  parseImported,
+  resetState,
+  DEMO_EARNED_IDS,
+} from './store.js';
+import { gradeCounts } from './filters.js';
+import { renderChecklist, renderRoadmap, renderMissables, renderNextUp, renderDetail } from './views.js';
 
-const viewEl = document.getElementById('view');
-const searchBox = document.getElementById('searchBox');
-const kindFilter = document.getElementById('kindFilter');
-const gradeFilter = document.getElementById('gradeFilter');
-const spoilerToggle = document.getElementById('spoilerToggle');
-const earnedOnlyToggle = document.getElementById('earnedOnlyToggle');
-const themeToggle = document.getElementById('themeToggle');
+const params = new URLSearchParams(location.search);
+const demoMode = params.get('demo') === '1';
 
 let trophies = [];
-let progress = loadProgress();
-let currentView = 'checklist';
-let openGuideId = null;
-let demoMode = false;
+let state = loadState();
+let selectedId = null;
 
-function readUrlParams() {
-  const params = new URLSearchParams(window.location.search);
-  const view = params.get('view');
-  if (['checklist', 'roadmap', 'missables', 'nextup', 'guide'].includes(view)) currentView = view;
-  const id = Number(params.get('id'));
-  if (Number.isInteger(id) && id >= 1 && id <= 55) openGuideId = id;
-  demoMode = params.get('demo') === '1';
+// Demo mode seeds 13 earned trophies in memory only, and only when the
+// player has no saved progress. Real progress is never overwritten.
+if (demoMode && !hasSavedState()) {
+  state.earned = [...DEMO_EARNED_IDS];
 }
 
-function gradeCounts(list) {
-  const counts = { platinum: 0, gold: 0, silver: 0, bronze: 0 };
-  for (const t of list) counts[t.grade] = (counts[t.grade] || 0) + 1;
-  return counts;
+const viewEl = document.getElementById('view');
+const detailEl = document.getElementById('detail');
+const layoutEl = document.querySelector('.layout');
+const searchEl = document.getElementById('search');
+const kindEl = document.getElementById('kind-filter');
+const gradeEl = document.getElementById('grade-filter');
+const spoilerEl = document.getElementById('spoiler-toggle');
+const earnedOnlyEl = document.getElementById('earned-only');
+const themeEl = document.getElementById('theme-toggle');
+const importFileEl = document.getElementById('import-file');
+
+function currentView() {
+  const view = params.get('view') || 'checklist';
+  return ['checklist', 'roadmap', 'missables', 'nextup', 'guide'].includes(view) ? view : 'checklist';
 }
 
-function updateHeader() {
-  const counts = gradeCounts(trophies);
-  const hiddenCount = trophies.filter((t) => t.hidden).length;
-  const earned = progress.earned.length;
-  document.getElementById('counts').innerHTML =
-    `<span class="count-chip"><b>${trophies.length}</b> trophies</span>` +
-    `<span class="count-chip"><b>${counts.platinum}</b> platinum</span>` +
-    `<span class="count-chip"><b>${counts.gold}</b> gold</span>` +
-    `<span class="count-chip"><b>${counts.silver}</b> silver</span>` +
-    `<span class="count-chip"><b>${counts.bronze}</b> bronze</span>` +
-    `<span class="count-chip"><b>${hiddenCount}</b> hidden</span>`;
-  document.getElementById('progressFill').style.width = `${Math.round((earned / trophies.length) * 100)}%`;
-  document.getElementById('progressText').textContent = `${earned} of ${trophies.length} earned`;
+function findTrophy(id) {
+  return trophies.find((t) => t.id === id) || null;
 }
 
-function currentFilters() {
-  return {
-    query: searchBox.value,
-    kind: kindFilter.value,
-    grade: gradeFilter.value,
-    spoilerOn: spoilerToggle.checked,
-    earnedOnly: earnedOnlyToggle.checked,
-  };
+function applyTheme() {
+  document.documentElement.dataset.theme = state.settings.night ? 'night' : 'paper';
+  themeEl.checked = state.settings.night;
 }
 
-function render() {
-  updateHeader();
-  document.querySelectorAll('.tab').forEach((tab) => {
-    tab.classList.toggle('active', tab.dataset.view === currentView);
+function renderHeader() {
+  const counts = gradeCounts(trophies, state);
+  const earned = state.earned.length;
+  document.getElementById('earned-count').textContent = String(earned);
+  document.getElementById('progress-fill').style.width = `${Math.round((earned / 55) * 100)}%`;
+  document.getElementById('grade-counts').textContent =
+    `Platinum ${counts.platinum[0]}/${counts.platinum[1]} · Gold ${counts.gold[0]}/${counts.gold[1]} · Silver ${counts.silver[0]}/${counts.silver[1]} · Bronze ${counts.bronze[0]}/${counts.bronze[1]}`;
+}
+
+function renderTabs() {
+  const view = currentView();
+  document.querySelectorAll('#tabs .tab').forEach((tab) => {
+    tab.classList.toggle('active', tab.dataset.view === view || (view === 'guide' && tab.dataset.view === 'checklist'));
   });
-  const filters = currentFilters();
-  if (currentView === 'checklist') renderChecklist(viewEl, trophies, progress, filters, openGuideId);
-  else if (currentView === 'roadmap') renderRoadmap(viewEl, trophies, progress);
-  else if (currentView === 'missables') renderMissables(viewEl, trophies, progress);
-  else if (currentView === 'nextup') renderNextUp(viewEl, trophies, progress);
-  else if (currentView === 'guide') renderGuide(viewEl, trophies, progress, openGuideId);
+  document.getElementById('toolbar').style.display = view === 'checklist' ? '' : 'none';
 }
 
-function switchView(view) {
-  currentView = view;
-  if (view !== 'checklist' && view !== 'guide') openGuideId = null;
-  render();
+function renderAll() {
+  renderHeader();
+  renderTabs();
+  applyTheme();
+  const view = currentView();
+  if (view === 'roadmap') viewEl.innerHTML = renderRoadmap(trophies, state);
+  else if (view === 'missables') viewEl.innerHTML = renderMissables(trophies, state);
+  else if (view === 'nextup') viewEl.innerHTML = renderNextUp(trophies, state);
+  else viewEl.innerHTML = renderChecklist(trophies, state);
+  const selected = selectedId ? findTrophy(selectedId) : null;
+  detailEl.innerHTML = selected ? renderDetail(selected, state) : '';
+  layoutEl.classList.toggle('detail-hidden', !selected);
+  // Keep the toolbar in sync with stored settings.
+  searchEl.value = state.settings.search;
+  kindEl.value = state.settings.kind;
+  gradeEl.value = state.settings.grade;
+  spoilerEl.checked = state.settings.spoilers;
+  earnedOnlyEl.checked = state.settings.earnedOnly;
 }
 
-function applyTheme(theme) {
-  document.body.dataset.theme = theme;
-  themeToggle.textContent = theme === 'night' ? 'Paper theme' : 'Night theme';
-  try {
-    localStorage.setItem('leonida-platinum-theme', theme);
-  } catch {
-    // Theme is a nicety; a blocked store must not break the app.
-  }
+function goTo(view, id) {
+  const next = new URLSearchParams(location.search);
+  next.set('view', view);
+  if (id) next.set('id', String(id));
+  else next.delete('id');
+  history.replaceState(null, '', `${location.pathname}?${next.toString()}`);
+  params.set('view', view);
+  if (id) params.set('id', String(id));
+  else params.delete('id');
+  selectedId = id || null;
+  renderAll();
+  window.scrollTo(0, 0);
 }
 
-// Checkbox ticks and guide toggles are rendered fresh on every render, so one
-// delegated listener on the view covers all of them.
-viewEl.addEventListener('change', (event) => {
-  const earnBox = event.target.closest('[data-earn]');
-  if (earnBox) {
-    progress = toggleEarned(progress, Number(earnBox.dataset.earn));
-    render();
+function selectTrophy(id) {
+  selectedId = id;
+  const view = currentView();
+  if (view !== 'checklist' && view !== 'guide') {
+    goTo('guide', id);
     return;
   }
-});
-
-viewEl.addEventListener('input', (event) => {
-  const noteBox = event.target.closest('[data-note]');
-  if (noteBox) {
-    progress = setNote(progress, Number(noteBox.dataset.note), noteBox.value);
-    updateHeader();
-  }
-});
-
-viewEl.addEventListener('click', (event) => {
-  const guideBtn = event.target.closest('[data-guide]');
-  if (guideBtn) {
-    const id = Number(guideBtn.dataset.guide);
-    openGuideId = openGuideId === id ? null : id;
-    if (currentView === 'guide') currentView = 'checklist';
-    render();
-  }
-});
-
-document.querySelectorAll('.tab').forEach((tab) => {
-  tab.addEventListener('click', () => switchView(tab.dataset.view));
-});
-
-for (const control of [searchBox, kindFilter, gradeFilter, spoilerToggle, earnedOnlyToggle]) {
-  control.addEventListener('input', () => {
-    if (currentView !== 'checklist') currentView = 'checklist';
-    render();
-  });
+  params.set('view', 'guide');
+  params.set('id', String(id));
+  history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
+  renderAll();
 }
 
-themeToggle.addEventListener('click', () => {
-  applyTheme(document.body.dataset.theme === 'night' ? 'paper' : 'night');
-});
+function download(filename, text) {
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
-document.getElementById('exportBtn').addEventListener('click', () => {
-  exportProgressFile(progress);
-});
-
-document.getElementById('importFile').addEventListener('change', async (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-  try {
-    const imported = parseImportedProgress(await file.text());
-    progress = saveProgress(imported);
-    render();
-  } catch {
-    alert('That file is not a Leonida Platinum progress export.');
-  }
-  event.target.value = '';
-});
-
-document.getElementById('resetBtn').addEventListener('click', () => {
-  if (confirm('Reset all earned ticks and notes?')) {
-    progress = resetProgress();
-    render();
-  }
-});
-
-async function startApp() {
-  readUrlParams();
-  const savedTheme = (() => {
-    try {
-      return localStorage.getItem('leonida-platinum-theme');
-    } catch {
-      return null;
-    }
-  })();
-  if (savedTheme === 'night' || savedTheme === 'paper') applyTheme(savedTheme);
-  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) applyTheme('night');
-
+async function boot() {
   const response = await fetch('./data/trophies.json');
   const data = await response.json();
   trophies = data.trophies;
-
-  // Demo mode seeds the fixed 13 earned trophies, but only when nothing is saved yet.
-  if (demoMode && progress.earned.length === 0 && Object.keys(progress.notes).length === 0) {
-    progress = seedDemoProgress();
+  const startId = Number(params.get('id'));
+  if (currentView() === 'guide' && Number.isInteger(startId) && findTrophy(startId)) {
+    selectedId = startId;
   }
-  if (currentView === 'guide' && !openGuideId) openGuideId = 17;
-  render();
+  renderAll();
 }
 
-startApp().catch((error) => {
-  viewEl.innerHTML = `<h2>Could not load the trophy list</h2><p class="intro">The guide needs data/trophies.json beside this page. (${String(error)})</p>`;
+document.querySelectorAll('#tabs .tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    selectedId = null;
+    goTo(tab.dataset.view, null);
+  });
 });
+
+searchEl.addEventListener('input', () => {
+  state.settings.search = searchEl.value;
+  saveState(state);
+  viewEl.innerHTML = renderChecklist(trophies, state);
+});
+
+kindEl.addEventListener('change', () => {
+  state.settings.kind = kindEl.value;
+  saveState(state);
+  viewEl.innerHTML = renderChecklist(trophies, state);
+});
+
+gradeEl.addEventListener('change', () => {
+  state.settings.grade = gradeEl.value;
+  saveState(state);
+  viewEl.innerHTML = renderChecklist(trophies, state);
+});
+
+spoilerEl.addEventListener('change', () => {
+  state.settings.spoilers = spoilerEl.checked;
+  saveState(state);
+  renderAll();
+});
+
+earnedOnlyEl.addEventListener('change', () => {
+  state.settings.earnedOnly = earnedOnlyEl.checked;
+  saveState(state);
+  viewEl.innerHTML = renderChecklist(trophies, state);
+});
+
+themeEl.addEventListener('change', () => {
+  state.settings.night = themeEl.checked;
+  saveState(state);
+  applyTheme();
+});
+
+// One delegated click handler for the whole page: rows open their guide,
+// checkboxes toggle earned, chips and buttons jump to a trophy.
+document.addEventListener('click', (event) => {
+  const earnBox = event.target.closest('[data-earn]');
+  if (earnBox) {
+    event.stopPropagation();
+    toggleEarned(state, Number(earnBox.dataset.earn));
+    renderAll();
+    return;
+  }
+  const closer = event.target.closest('#detail-close');
+  if (closer) {
+    selectedId = null;
+    const view = currentView();
+    if (view === 'guide') goTo('checklist', null);
+    else renderAll();
+    return;
+  }
+  const saver = event.target.closest('#note-save');
+  if (saver) {
+    const area = document.getElementById('trophy-note');
+    if (area) {
+      setNote(state, Number(area.dataset.note), area.value);
+      renderAll();
+    }
+    return;
+  }
+  const row = event.target.closest('[data-id]');
+  if (row) selectTrophy(Number(row.dataset.id));
+});
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  download('leonida-platinum-progress.json', exportState(state));
+});
+
+document.getElementById('import-btn').addEventListener('click', () => importFileEl.click());
+
+importFileEl.addEventListener('change', async () => {
+  const file = importFileEl.files[0];
+  if (!file) return;
+  try {
+    state = parseImported(await file.text());
+    saveState(state);
+    renderAll();
+    alert('Progress imported.');
+  } catch (err) {
+    alert(`Could not import that file: ${err.message}`);
+  }
+  importFileEl.value = '';
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  if (!confirm('Reset all earned trophies, notes and settings?')) return;
+  state = resetState();
+  selectedId = null;
+  renderAll();
+});
+
+boot();

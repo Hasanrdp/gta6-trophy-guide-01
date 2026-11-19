@@ -1,171 +1,211 @@
-// Views — one job: turn the trophy list and the saved progress into HTML for each tab.
-// Every view is a pure render from (trophies, progress, filters); events are wired by main.js.
+// views.js — every screen of Leonida Platinum, rendered from the trophy data.
+//
+// Screens: checklist, roadmap, missables, next-up planner, and the per-trophy
+// guide detail pane. All text comes from app/data/trophies.json; the roadmap
+// stage blurbs below are this guide's own words, built from the official
+// descriptions and the PowerPyx roadmap.
 
-import { gradeLetter, kindLabel, applyChecklistFilters, sortByRoadmap, nextUpTrophies } from './filters.js';
+import { KIND_LABELS, GRADE_LABELS, isSpoilerHidden, filterTrophies, gradeCounts, stageTrophies, nextUpTrophies } from './filters.js';
 
-// The five roadmap stages, with the hours PowerPyx's guide implies for each.
-export const ROADMAP_STAGES = [
+export const STAGES = [
   {
-    stage: 1,
-    name: 'Stage 1 — Story first',
+    n: 1,
+    title: 'Stage 1 — Story first',
     hours: '60–80 hours',
     blurb:
-      'Play the story straight through: Chapters 1–4 and the final mission. Keep a manual save at the end of every chapter — there is no mission replay. Do the Chapter 1 meditation at Jason’s house before that chapter ends, or Positive Mental Attitude is lost for this playthrough. Cheats disable trophies AND saving, so leave them alone.',
+      'Play Chapters 1–4 and the finale in order. This is where the chapter trophies, the named story missions and the story moments live. Do the Chapter 1 meditation at Jason\u2019s house before the chapter ends — it is the only missable in the game. Keep a manual save at the end of each chapter: the game has no mission replay, and cheats disable trophies and saving, so do not touch them.',
   },
   {
-    stage: 2,
-    name: 'Stage 2 — Side stories',
-    hours: '10–15 hours',
-    blurb:
-      'Finish the side-character strands — Andy, Kenton, Billy, Randy and Tyrone — plus 8 Strangers & Freaks strands and Bret’s hunt. All of it stays open in free roam after the story.',
-  },
-  {
-    stage: 3,
-    name: 'Stage 3 — Activities & challenges',
-    hours: '25–35 hours',
-    blurb:
-      'The grind stage: 42 Shooting Range golds, drone races at all 14 locations, 250 stunts, 20 race wins, 50 challenges, arcade, fishing against Cal, bowling, and all 18 meditation spots.',
-  },
-  {
-    stage: 4,
-    name: 'Stage 4 — Collectibles & exploration',
-    hours: '20–30 hours',
-    blurb:
-      'Sweep Leonida properly: 3 card sets, WAiNK at 100 locations, 100 vehicles, all 52 areas, 8 garages and 10 Scooter Bros registrations. One road trip can feed three trophies at once.',
-  },
-  {
-    stage: 5,
-    name: 'Stage 5 — Money, robberies & cleanup',
+    n: 2,
+    title: 'Stage 2 — Side stories',
     hours: '15–25 hours',
     blurb:
-      'Launder $250,000 of marked bills, spend $100,000, rob 5 bank vaults, an armored truck and a jewelry store undetected, hit one illegal operation per gang, then run the 100% checklist. A Long Road (gold) pops, and the platinum follows.',
+      'With the story open, clear the side-story contacts: Andy, Kenton, Billy, Randy and Tyrone, each to their final mission. Add any 8 Strangers & Freaks strands you pass along the way, and take Bret\u2019s hunt when it appears. Strangers & Freaks strands are not needed for 100% completion, so treat them as a trophy of their own, not a checklist item.',
+  },
+  {
+    n: 3,
+    title: 'Stage 3 — Activities & challenges',
+    hours: '30–40 hours',
+    blurb:
+      'The long grind stage. Gold all 42 Shooting Range challenges, win a Top Fun drone race at all 14 locations, win 20 different races, finish 50 challenges and 250 stunts, beat Cal at fishing, finish an arcade game, try all 9 activity types, and meditate at the remaining 17 spots. Do the partner trophies here too: lose a 4-star wanted level together and rob 3 shops back-to-back without losing the heat.',
+  },
+  {
+    n: 4,
+    title: 'Stage 4 — Collectibles & exploration',
+    hours: '25–35 hours',
+    blurb:
+      'Sweep Leonida region by region: 3 Collectible Card sets, WAiNK It at 100 locations, 100 vehicles discovered, all 52 areas explored, all 8 garage properties bought, and 10 vehicles registered to the Scooter Bros app. Exploration feeds the 100% checklist directly — vehicles and areas especially — so log everything as you go.',
+  },
+  {
+    n: 5,
+    title: 'Stage 5 — Money, robberies & cleanup',
+    hours: '20–30 hours',
+    blurb:
+      'Launder $250,000 of marked bills through your contacts, spend $100,000 across all shops, rob 5 bank vaults, an armored truck and a jewelry store undetected, rob one illegal operation per gang of 9, and clear the combat one-offs (Combat Focus, the VCIA departure, the Rhinos). Then run the 100% checklist — 200 of 277 vehicles, 100 of 255 animals, 50 of 66 weapons, 70 of 80 challenges, 300 of 397 stunts — for the A Long Road gold, and the platinum follows.',
   },
 ];
 
-function escapeHtml(text) {
+export function escapeHtml(text) {
   return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-function trophyTags(trophy) {
-  const tags = [`<span class="tag">${escapeHtml(trophy.grade)}</span>`, `<span class="tag">${escapeHtml(kindLabel(trophy.kind))}</span>`];
-  if (trophy.hidden) tags.push('<span class="tag hidden-tag">Hidden on PSN</span>');
-  if (trophy.missable && trophy.missable !== 'no') tags.push('<span class="tag missable">Missable</span>');
-  if (trophy.targetLabel) tags.push(`<span class="tag">Target: ${escapeHtml(trophy.targetLabel)}</span>`);
+function medalDot(grade) {
+  return `<span class="medal ${grade}" title="${GRADE_LABELS[grade]}"></span>`;
+}
+
+function trophyTags(trophy, state) {
+  const tags = [];
+  tags.push(`<span class="tag">${KIND_LABELS[trophy.kind] || trophy.kind}</span>`);
+  if (trophy.hidden) tags.push('<span class="tag hidden-tag">Hidden</span>');
+  if (trophy.missable === 'possible') tags.push('<span class="tag missable">⚠ Missable</span>');
+  if (trophy.target) {
+    tags.push(`<span class="tag target">PSN target: ${trophy.targetLabel}</span>`);
+  }
+  if (state.notes[trophy.id]) tags.push('<span class="tag" title="You left a note on this trophy">✎ Note</span>');
   return tags.join('');
 }
 
-function guideHtml(trophy) {
-  const steps = (trophy.steps || []).map((s) => `<li>${escapeHtml(s)}</li>`).join('');
-  const sources = (trophy.sources || [])
+function trophyRow(trophy, state) {
+  const earned = state.earned.includes(trophy.id);
+  const hidden = isSpoilerHidden(trophy, state);
+  const name = hidden ? 'Hidden trophy' : escapeHtml(trophy.name);
+  const desc = hidden
+    ? '<span class="spoiler-note">Hidden on PlayStation until earned — tick it off to reveal it.</span>'
+    : escapeHtml(trophy.description);
+  return `<li class="trophy-row${earned ? ' earned' : ''}" data-id="${trophy.id}">
+    <input type="checkbox" data-earn="${trophy.id}" ${earned ? 'checked' : ''} aria-label="Mark ${escapeHtml(trophy.name)} as earned">
+    ${medalDot(trophy.grade)}
+    <div class="trophy-main">
+      <div class="trophy-name">${name}<span class="grade-label">${GRADE_LABELS[trophy.grade]}</span></div>
+      <div class="trophy-desc">${desc}</div>
+      <div class="trophy-meta">${trophyTags(trophy, state)}</div>
+    </div>
+  </li>`;
+}
+
+export function renderChecklist(trophies, state) {
+  const shown = filterTrophies(trophies, state);
+  const earnedTotal = state.earned.length;
+  const head = `<p class="list-summary">Showing <strong>${shown.length}</strong> of 55 trophies &middot; <strong>${earnedTotal}</strong> earned. Click a trophy to open its guide.</p>`;
+  if (shown.length === 0) {
+    return `${head}<p class="empty-note">No trophies match these filters. Clear the search or widen the kind and grade filters.</p>`;
+  }
+  return `${head}<ul class="trophy-list">${shown.map((t) => trophyRow(t, state)).join('')}</ul>`;
+}
+
+export function renderRoadmap(trophies, state) {
+  const advice = `<div class="info-card">
+    <h2>Before you start — read this first</h2>
+    <p><strong>No mission replay.</strong> Once a story mission is done it cannot be replayed, so keep a manual save at the end of every chapter. A missed story beat means a new playthrough.</p>
+    <p><strong>Cheats disable trophies — and saving.</strong> Do not use cheats on a platinum run at all; the game blocks trophies and saving while they are active.</p>
+    <p><strong>One playthrough, about 200 hours, all offline.</strong> The list is 55 offline trophies and 0 online. Free-roam stays open after the story, so almost everything can be cleaned up after the finale — except the Chapter 1 meditation spot.</p>
+  </div>`;
+  const stages = STAGES.map((stage) => {
+    const list = stageTrophies(trophies, stage.n);
+    const chips = list
+      .map((t) => {
+        const earned = state.earned.includes(t.id);
+        return `<button type="button" class="stage-chip${earned ? ' earned' : ''}" data-id="${t.id}"><span class="dot ${t.grade}"></span>${escapeHtml(t.name)}</button>`;
+      })
+      .join('');
+    return `<section class="stage-card">
+      <h2>${escapeHtml(stage.title)}<span class="hours">${stage.hours}</span></h2>
+      <p>${escapeHtml(stage.blurb)}</p>
+      <div class="stage-trophies">${chips}</div>
+    </section>`;
+  }).join('');
+  return advice + stages;
+}
+
+export function renderMissables(trophies, state) {
+  const missable = trophies.filter((t) => t.missable === 'possible');
+  const story = trophies.filter((t) => t.kind === 'story' && t.missable !== 'possible');
+  const cards = missable
+    .map((t) => {
+      const earned = state.earned.includes(t.id);
+      return `<section class="stage-card warning-card">
+      <h2>⚠ ${escapeHtml(t.name)} — the only missable trophy</h2>
+      <p><strong>Official description:</strong> ${escapeHtml(t.description)}</p>
+      <p>${escapeHtml(t.guide)}</p>
+      <p><strong>When it can be missed:</strong> ${escapeHtml(t.missableNote)}</p>
+      <p>Status: ${earned ? 'Earned — safe.' : 'Not earned yet — meditate at Jason\u2019s house before Chapter 1 ends.'}</p>
+      <p><button type="button" class="btn" data-id="${t.id}">Open its full guide</button></p>
+    </section>`;
+    })
+    .join('');
+  const safeRows = story
+    .map((t) => `<li class="trophy-row" data-id="${t.id}">${medalDot(t.grade)}<div class="trophy-main"><div class="trophy-name">${escapeHtml(t.name)}<span class="grade-label">${GRADE_LABELS[t.grade]}</span></div><div class="trophy-desc">${escapeHtml(t.description)}</div><div class="trophy-meta"><span class="tag">Story — cannot be missed</span></div></div></li>`)
+    .join('');
+  return `${cards}
+  <div class="info-card">
+    <h2>No other trophy is confirmed missable yet</h2>
+    <p>Every other trophy on the list can be earned in free-roam after the story, or unlocks automatically as the story plays. That is the position of the guides this page cites as of 19 November 2026; if a second missable is ever confirmed, this page will say so here.</p>
+  </div>
+  <h2 class="serif">Story trophies — all safe</h2>
+  <ul class="trophy-list">${safeRows}</ul>`;
+}
+
+export function renderNextUp(trophies, state) {
+  const next = nextUpTrophies(trophies, state, 10);
+  const counts = gradeCounts(trophies, state);
+  const total = state.earned.length;
+  const intro = `<div class="info-card">
+    <h2>Your next trophies, in roadmap order</h2>
+    <p>You have earned <strong>${total} of 55</strong> (Platinum ${counts.platinum[0]}/${counts.platinum[1]} &middot; Gold ${counts.gold[0]}/${counts.gold[1]} &middot; Silver ${counts.silver[0]}/${counts.silver[1]} &middot; Bronze ${counts.bronze[0]}/${counts.bronze[1]}). The planner below lists the next unearned trophies in the order the roadmap takes them, so you always know what to do next.</p>
+  </div>`;
+  if (next.length === 0) {
+    return `${intro}<p class="empty-note">Every trophy is earned. Vice got its price — you are a Leonida Legend.</p>`;
+  }
+  const rows = next
+    .map((t, i) => {
+      const stage = STAGES.find((s) => s.n === t.stage);
+      return `<li class="trophy-row" data-id="${t.id}">
+      <span class="next-num">${i + 1}</span>${medalDot(t.grade)}
+      <div class="trophy-main">
+        <div class="trophy-name">${escapeHtml(t.name)}<span class="grade-label">${GRADE_LABELS[t.grade]}</span></div>
+        <div class="trophy-desc">${escapeHtml(t.description)}</div>
+        <div class="trophy-meta"><span class="tag">${escapeHtml(stage ? stage.title : '')}</span>${t.missable === 'possible' ? '<span class="tag missable">⚠ Missable — do it now</span>' : ''}${t.target ? `<span class="tag target">PSN target: ${t.targetLabel}</span>` : ''}</div>
+      </div>
+    </li>`;
+    })
+    .join('');
+  return `${intro}<ul class="trophy-list">${rows}</ul>`;
+}
+
+export function renderDetail(trophy, state) {
+  if (!trophy) return '';
+  const earned = state.earned.includes(trophy.id);
+  const hidden = isSpoilerHidden(trophy, state);
+  const name = hidden ? 'Hidden trophy' : escapeHtml(trophy.name);
+  const desc = hidden ? 'Hidden on PlayStation until earned.' : escapeHtml(trophy.description);
+  const steps = trophy.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('');
+  const sources = trophy.sources
     .map((s) => `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.name)}</a>`)
     .join('');
-  const missableNote =
-    trophy.missable && trophy.missable !== 'no'
-      ? `<p><strong>When it can be missed:</strong> the first meditation spot, at Jason’s house in Chapter 1, is permanently unavailable after that chapter ends. Meditate there first.</p>`
-      : `<p><strong>When it can be missed:</strong> it cannot — no other trophy is confirmed missable yet.</p>`;
-  return `<div class="guide-body">
-    <p>${escapeHtml(trophy.guide)}</p>
-    ${steps ? `<ol>${steps}</ol>` : ''}
-    ${missableNote}
-    <p class="sources"><strong>Sources:</strong> ${sources}</p>
-  </div>`;
-}
-
-export function trophyCardHtml(trophy, progress, options = {}) {
-  const earned = progress.earned.includes(trophy.id);
-  const spoilerOn = options.spoilerOn && trophy.hidden && !earned;
-  const name = spoilerOn ? 'Hidden trophy — earn it to reveal' : escapeHtml(trophy.name);
-  const desc = spoilerOn ? 'Its name and description stay secret until you earn it.' : escapeHtml(trophy.description);
-  const note = progress.notes[trophy.id] || '';
-  const open = options.openGuideId === trophy.id;
-  return `<article class="trophy-card${earned ? ' earned' : ''}" data-id="${trophy.id}">
-    <div class="trophy-head">
-      <span class="medal ${escapeHtml(trophy.grade)}" title="${escapeHtml(trophy.grade)}">${gradeLetter(trophy.grade)}</span>
-      <div class="trophy-title">
-        <h3>${name}</h3>
-        <p class="desc">${desc}</p>
-        <div class="tags">${trophyTags(trophy)}</div>
-      </div>
-      <span class="earn-box">
-        <input type="checkbox" id="earn-${trophy.id}" data-earn="${trophy.id}" ${earned ? 'checked' : ''}>
-        <label for="earn-${trophy.id}">${earned ? 'Earned' : 'Earn it'}</label>
-      </span>
-    </div>
-    <button type="button" class="guide-toggle" data-guide="${trophy.id}">${open ? 'Hide guide ▲' : 'Read the guide ▼'}</button>
-    ${open ? guideHtml(trophy) : ''}
-    <label class="note-label" for="note-${trophy.id}">Your note</label>
-    <input type="text" class="note-input" id="note-${trophy.id}" data-note="${trophy.id}" placeholder="e.g. 31/42 range golds — retry the shotgun one" value="${escapeHtml(note)}">
-  </article>`;
-}
-
-export function renderChecklist(viewEl, trophies, progress, filters, openGuideId) {
-  const shown = applyChecklistFilters(trophies, filters, progress);
-  const earnedCount = progress.earned.length;
-  let html = `<h2>Checklist</h2>
-  <p class="intro">All 55 official trophies with their PlayStation name, description and grade. Tick one off when you earn it — it is saved in your browser. Open a guide for the steps, the missable warning and the sources behind it.</p>`;
-  html += shown.map((t) => trophyCardHtml(t, progress, { spoilerOn: filters.spoilerOn, openGuideId })).join('');
-  if (shown.length === 0) html += '<p class="empty">No trophies match those filters. Clear the search or widen the kind and grade.</p>';
-  else html += `<p class="intro">Showing ${shown.length} of 55 trophies · ${earnedCount} earned.</p>`;
-  viewEl.innerHTML = html;
-}
-
-export function renderRoadmap(viewEl, trophies, progress) {
-  let html = `<h2>Roadmap to the platinum</h2>
-  <p class="intro">Five stages, in order. PowerPyx rates the platinum 4/10 difficulty and about 200 hours — 55 offline trophies, none online.</p>
-  <div class="callout"><h3>Before you start</h3>
-  <p><strong>No mission replay:</strong> keep a manual save at the end of every chapter. <strong>Cheats disable trophies and saving.</strong> <strong>One missable trophy:</strong> Positive Mental Attitude — meditate at Jason’s house in Chapter 1 before the chapter ends.</p></div>`;
-  for (const stage of ROADMAP_STAGES) {
-    const members = trophies.filter((t) => t.stage === stage.stage);
-    const done = members.filter((t) => progress.earned.includes(t.id)).length;
-    const items = sortByRoadmap(members)
-      .map(
-        (t) =>
-          `<li class="${progress.earned.includes(t.id) ? 'done' : ''}">${escapeHtml(t.name)} <span class="tag">${escapeHtml(t.grade)}</span></li>`,
-      )
-      .join('');
-    html += `<section class="stage-card"><h3>${escapeHtml(stage.name)} <span class="hours">· ${escapeHtml(stage.hours)} · ${done}/${members.length} earned</span></h3>
-    <p>${escapeHtml(stage.blurb)}</p><ol class="stage-list">${items}</ol></section>`;
-  }
-  viewEl.innerHTML = html;
-}
-
-export function renderMissables(viewEl, trophies, progress) {
-  const missable = trophies.filter((t) => t.missable && t.missable !== 'no');
-  const story = trophies.filter((t) => t.kind === 'story');
-  let html = `<h2>Missables</h2>
-  <p class="intro">Only one trophy can be missed. Everything else is safe to clean up in free roam after the story.</p>
-  <div class="warning"><h3>⚠ The one missable trophy</h3>
-  <p><strong>Positive Mental Attitude</strong> — meditate at every spot across Leonida (18 spots).</p>
-  <p>The first spot, at Jason’s house in Chapter 1, becomes permanently unavailable once Chapter 1 ends. Meditate there before the chapter closes, then find the other 17 spots in free roam.</p></div>`;
-  html += missable.map((t) => trophyCardHtml(t, progress, {})).join('');
-  html += `<h2>Story trophies — cannot be missed</h2>
-  <p class="intro">These unlock by playing the story and its side strands. Free roam after the story keeps every side strand open, so none of them can be missed.</p>`;
-  html += story.map((t) => trophyCardHtml(t, progress, {})).join('');
-  viewEl.innerHTML = html;
-}
-
-export function renderNextUp(viewEl, trophies, progress) {
-  const next = nextUpTrophies(trophies, progress, 8);
-  let html = `<h2>Next up</h2>
-  <p class="intro">The next unearned trophies in roadmap order — start at the top and work down. ${progress.earned.length} of 55 earned so far.</p>`;
-  if (next.length === 0) {
-    html += '<p class="empty">That is the platinum — every trophy earned. Vice got a price, and you paid it.</p>';
-  } else {
-    html += next.map((t) => trophyCardHtml(t, progress, {})).join('');
-  }
-  viewEl.innerHTML = html;
-}
-
-export function renderGuide(viewEl, trophies, progress, guideId) {
-  const trophy = trophies.find((t) => t.id === guideId) || trophies[0];
-  const earned = progress.earned.includes(trophy.id);
-  let html = `<h2>Guide — ${escapeHtml(trophy.name)}</h2>
-  <p class="intro">One trophy, in full: the official description, the guide, the steps, when it can be missed, and the sources behind every fact.</p>`;
-  html += trophyCardHtml(trophy, progress, { openGuideId: trophy.id });
-  html += `<p class="intro">Earned: ${earned ? 'yes' : 'not yet'}. ${trophy.targetLabel ? `PSN tracks this to ${escapeHtml(trophy.targetLabel)}.` : ''}</p>`;
-  viewEl.innerHTML = html;
+  const missableBlock =
+    trophy.missable === 'possible'
+      ? `<div class="missable-callout"><strong>⚠ Missable.</strong> ${escapeHtml(trophy.missableNote)}</div>`
+      : `<div class="safe-callout"><strong>Not missable.</strong> ${escapeHtml(trophy.missableNote)}</div>`;
+  const note = state.notes[trophy.id] ? escapeHtml(state.notes[trophy.id]) : '';
+  return `<button type="button" class="btn close-btn" id="detail-close">Close ✕</button>
+  <p class="eyebrow">${GRADE_LABELS[trophy.grade]} trophy &middot; ${KIND_LABELS[trophy.kind] || trophy.kind}${trophy.hidden ? ' &middot; Hidden' : ''}</p>
+  <h2>${name}</h2>
+  <p class="official">Official description: “${desc}”</p>
+  <p><label class="check"><input type="checkbox" data-earn="${trophy.id}" ${earned ? 'checked' : ''}> Earned</label>
+  ${trophy.target ? `<span class="tag target">PSN target: ${trophy.targetLabel}</span>` : ''}</p>
+  ${missableBlock}
+  <h3>Guide</h3>
+  <p>${escapeHtml(trophy.guide)}</p>
+  <h3>Sources</h3>
+  <p class="sources">Each fact above is cited to: ${sources}. The official name, description and grade come from the official list; the method from PowerPyx where one is published.</p>
+  <h3>Steps</h3>
+  <ol>${steps}</ol>
+  <h3>Your note</h3>
+  <textarea id="trophy-note" data-note="${trophy.id}" placeholder="Your own note — where you found it, what worked…">${note}</textarea>
+  <p><button type="button" class="btn primary" id="note-save">Save note</button></p>`;
 }

@@ -1,81 +1,100 @@
-// Progress store — one job: remember what the player has earned, in localStorage only.
-// Nothing here touches the network. The demo seed is a fixed list, used only when the
-// page is opened with ?demo=1 and no saved progress exists yet.
+// store.js — saved progress for Leonida Platinum.
+//
+// Everything lives in one localStorage key so the whole state can be exported
+// and imported as a single JSON file. Nothing leaves the browser.
 
 export const STORAGE_KEY = 'leonida-platinum-v1';
 
-// The fixed demo set: 13 trophies, chosen to show every grade and several kinds.
+// The demo seed: a fixed set of 13 trophies used only when the page is opened
+// with ?demo=1 and no saved progress exists. It is never written to storage,
+// so real players always start at zero.
 export const DEMO_EARNED_IDS = [2, 3, 8, 20, 21, 33, 36, 37, 44, 45, 46, 51, 55];
 
-export function loadProgress() {
+export function blankState() {
+  return {
+    earned: [],
+    notes: {},
+    settings: { spoilers: true, earnedOnly: false, night: false, kind: 'all', grade: 'all', search: '' },
+  };
+}
+
+export function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { earned: [], notes: {} };
+    if (!raw) return blankState();
     const parsed = JSON.parse(raw);
-    return {
-      earned: Array.isArray(parsed.earned) ? parsed.earned.filter((n) => Number.isInteger(n)) : [],
-      notes: parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {},
-    };
+    if (!parsed || !Array.isArray(parsed.earned)) return blankState();
+    const state = blankState();
+    state.earned = parsed.earned.filter((id) => Number.isInteger(id));
+    state.notes = parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {};
+    state.settings = { ...state.settings, ...(parsed.settings || {}) };
+    return state;
   } catch {
-    return { earned: [], notes: {} };
+    return blankState();
   }
 }
 
-export function saveProgress(progress) {
-  const clean = {
-    earned: [...new Set(progress.earned)].sort((a, b) => a - b),
-    notes: Object.fromEntries(
-      Object.entries(progress.notes || {}).filter(([, v]) => typeof v === 'string' && v.trim() !== ''),
-    ),
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-  return clean;
+export function saveState(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function isEarned(progress, id) {
-  return progress.earned.includes(id);
+export function hasSavedState() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
 }
 
-export function toggleEarned(progress, id) {
-  const next = { earned: [...progress.earned], notes: { ...progress.notes } };
-  const at = next.earned.indexOf(id);
-  if (at === -1) next.earned.push(id);
-  else next.earned.splice(at, 1);
-  return saveProgress(next);
+export function isEarned(state, id) {
+  return state.earned.includes(id);
 }
 
-export function setNote(progress, id, text) {
-  const next = { earned: [...progress.earned], notes: { ...progress.notes } };
-  if (text.trim() === '') delete next.notes[id];
-  else next.notes[id] = text;
-  return saveProgress(next);
+export function toggleEarned(state, id) {
+  const at = state.earned.indexOf(id);
+  if (at === -1) state.earned.push(id);
+  else state.earned.splice(at, 1);
+  state.earned.sort((a, b) => a - b);
+  saveState(state);
+  return state;
 }
 
-export function seedDemoProgress() {
-  return saveProgress({ earned: [...DEMO_EARNED_IDS], notes: {} });
+export function setNote(state, id, text) {
+  const clean = String(text || '').trim();
+  if (clean) state.notes[id] = clean;
+  else delete state.notes[id];
+  saveState(state);
+  return state;
 }
 
-export function resetProgress() {
-  localStorage.removeItem(STORAGE_KEY);
-  return { earned: [], notes: {} };
+export function exportState(state) {
+  return JSON.stringify(
+    { app: 'leonida-platinum', version: 1, exportedAt: new Date().toISOString(), ...state },
+    null,
+    2,
+  );
 }
 
-export function exportProgressFile(progress) {
-  const blob = new Blob([JSON.stringify(progress, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = 'leonida-platinum-progress.json';
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-export function parseImportedProgress(text) {
+export function parseImported(text) {
   const parsed = JSON.parse(text);
-  if (!parsed || typeof parsed !== 'object') throw new Error('not an object');
-  const earned = Array.isArray(parsed.earned) ? parsed.earned : [];
-  const notes = parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {};
-  return { earned: earned.filter((n) => Number.isInteger(n) && n >= 1 && n <= 55), notes };
+  if (!parsed || !Array.isArray(parsed.earned)) throw new Error('Not a Leonida Platinum export: no earned list.');
+  const state = blankState();
+  state.earned = parsed.earned.filter((id) => Number.isInteger(id));
+  state.notes = parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {};
+  state.settings = { ...state.settings, ...(parsed.settings || {}) };
+  return state;
+}
+
+export function resetState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage unavailable: the in-memory state is reset by the caller.
+  }
+  return blankState();
 }
