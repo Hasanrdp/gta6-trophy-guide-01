@@ -1,39 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="paper">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Leonida Platinum — GTA 6 Trophy Guide &amp; Tracker</title>
-<meta name="description" content="An offline guide and tracker for all 55 Grand Theft Auto VI trophies on PlayStation 5: checklist, roadmap to the platinum, missable flags and a cited guide for every trophy.">
+<meta name="description" content="An offline guide and tracker for all 55 Grand Theft Auto VI trophies: checklist, roadmap to the platinum, missables and a cited guide for every trophy.">
 <link rel="stylesheet" href="./style.css">
 </head>
-<body data-theme="paper">
+<body>
 <header class="masthead">
   <div class="masthead-inner">
-    <p class="kicker">Grand Theft Auto VI &middot; PlayStation 5 &middot; Offline guide</p>
-    <h1>Leonida Platinum</h1>
-    <p class="lede">Every one of the 55 official trophies — tracked, guided and road-mapped to the platinum. No account, no network, no ads. Your progress lives in your browser.</p>
-    <div class="counts" id="counts" aria-live="polite"></div>
-    <div class="progress-wrap">
-      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-      <p class="progress-text" id="progressText">0 of 55 earned</p>
+    <div>
+      <p class="eyebrow">Grand Theft Auto VI &middot; PlayStation 5 &middot; 55 trophies</p>
+      <h1>Leonida Platinum</h1>
+      <p class="tagline">The offline trophy guide and tracker for GTA 6 — every trophy, a roadmap to the platinum, and the one missable flagged.</p>
+    </div>
+    <div class="progress-card" id="progress-card" aria-label="Overall progress">
+      <p class="big-count"><span id="earned-count">0</span><span class="of"> / 55 earned</span></p>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <p class="grade-counts" id="grade-counts">Platinum 0/1 &middot; Gold 0/2 &middot; Silver 0/6 &middot; Bronze 0/46</p>
+      <p class="hidden-count" id="hidden-count">28 hidden trophies &middot; 27 visible</p>
     </div>
   </div>
+  <nav class="tabs" id="tabs" aria-label="Views">
+    <button type="button" data-view="checklist" class="tab active">Checklist</button>
+    <button type="button" data-view="roadmap" class="tab">Roadmap</button>
+    <button type="button" data-view="missables" class="tab">Missables</button>
+    <button type="button" data-view="nextup" class="tab">Next up</button>
+  </nav>
 </header>
 
-<nav class="tabs" aria-label="Views">
-  <button type="button" class="tab active" data-view="checklist">Checklist</button>
-  <button type="button" class="tab" data-view="roadmap">Roadmap</button>
-  <button type="button" class="tab" data-view="missables">Missables</button>
-  <button type="button" class="tab" data-view="nextup">Next up</button>
-  <button type="button" class="tab" data-view="guide">Guide</button>
-  <span class="theme-slot"><button type="button" id="themeToggle" class="btn small">Night theme</button></span>
-</nav>
-
-<section class="toolbar" aria-label="Filters and progress tools">
-  <label class="search-label">Search <input type="search" id="searchBox" placeholder="Trophy name or description…" autocomplete="off"></label>
+<section class="toolbar" id="toolbar" aria-label="Filters and settings">
+  <label class="search-box">Search
+    <input type="search" id="search" placeholder="Search name or description…" autocomplete="off">
+  </label>
   <label>Kind
-    <select id="kindFilter">
+    <select id="kind-filter">
       <option value="all">All kinds</option>
       <option value="story">Story</option>
       <option value="missable">Missable</option>
@@ -42,10 +44,13 @@
       <option value="combat">Combat</option>
       <option value="exploration">Exploration</option>
       <option value="money">Money</option>
+      <option value="social">Social</option>
+      <option value="platinum">Platinum</option>
+      <option value="completion">100% completion</option>
     </select>
   </label>
   <label>Grade
-    <select id="gradeFilter">
+    <select id="grade-filter">
       <option value="all">All grades</option>
       <option value="platinum">Platinum</option>
       <option value="gold">Gold</option>
@@ -53,22 +58,37 @@
       <option value="bronze">Bronze</option>
     </select>
   </label>
-  <label class="check"><input type="checkbox" id="spoilerToggle"> Hide spoilers (hidden trophies stay secret until earned)</label>
-  <label class="check"><input type="checkbox" id="earnedOnlyToggle"> Earned only</label>
-  <span class="tool-buttons">
-    <button type="button" id="exportBtn" class="btn">Export progress</button>
-    <label class="btn file-btn">Import progress <input type="file" id="importFile" accept="application/json,.json" hidden></label>
-    <button type="button" id="resetBtn" class="btn danger">Reset</button>
-  </span>
+  <label class="check"><input type="checkbox" id="spoiler-toggle" checked> Hide story spoilers</label>
+  <label class="check"><input type="checkbox" id="earned-only"> Earned only</label>
+  <label class="check"><input type="checkbox" id="theme-toggle"> Night theme</label>
+  <span class="spacer"></span>
+  <button type="button" id="export-btn" class="btn">Export progress</button>
+  <button type="button" id="import-btn" class="btn">Import progress</button>
+  <input type="file" id="import-file" accept="application/json,.json" hidden>
+  <button type="button" id="reset-btn" class="btn danger">Reset</button>
 </section>
 
-<main id="view" class="view"></main>
+<main class="layout">
+  <div class="content" id="view" aria-live="polite"></div>
+  <aside class="detail" id="detail" aria-label="Trophy guide detail"></aside>
+</main>
 
 <footer class="colophon">
-  <p><strong>Sources.</strong> Official names, descriptions and grades: <a href="https://www.exophase.com/game/grand-theft-auto-vi-psn/trophies/">Exophase</a> and <a href="https://psnprofiles.com/trophies/43531-grand-theft-auto-vi">PSNProfiles</a> (they agree on all 55). Methods and roadmap: <a href="https://www.powerpyx.com/gta-6-grand-theft-auto-vi-trophy-guide-roadmap/">PowerPyx</a>. Hidden/visible split cross-checked on <a href="https://www.planetgta6.com/en/gta-6-trophies/">Planet GTA 6</a> and <a href="https://gta-zone.com/news/gta-6-trophies-achievements/">GTA Zone</a>. Every guide here is written in our own words; sources are cited, never copied.</p>
-  <p><strong>Honesty note.</strong> Five trophies have no confirmed method published yet (In The Beginning…, Capital Offense, Bad Luck, I Guess, The Truth Is Out There, Ten Pin). Their guides say so plainly instead of inventing steps.</p>
-  <p><strong>Offline.</strong> This page loads only its own files. It fetches <code>data/trophies.json</code> from the same folder and saves your checklist in your browser's local storage — nothing leaves your device.</p>
-  <p class="fine">Leonida Platinum is an unofficial fan guide. Grand Theft Auto and GTA are trademarks of Take-Two Interactive; no Rockstar artwork or logo is used here.</p>
+  <h2>Method &amp; sources</h2>
+  <p>Names, descriptions, grades and hidden flags are the official PlayStation 5 list as published by
+  <a href="https://www.exophase.com/game/grand-theft-auto-vi-psn/trophies/">Exophase</a> and
+  <a href="https://psnprofiles.com/trophies/43531-grand-theft-auto-vi">PSNProfiles</a> (the two agree on all 55),
+  cross-checked for the hidden/visible split against
+  <a href="https://www.planetgta6.com/en/gta-6-trophies/">Planet GTA 6</a> and
+  <a href="https://gta-zone.com/news/gta-6-trophies-achievements/">GTA Zone</a>.
+  The roadmap and the 100% completion breakdown follow
+  <a href="https://www.powerpyx.com/gta-6-grand-theft-auto-vi-trophy-guide-roadmap/">PowerPyx</a>:
+  platinum difficulty 4/10, about 200 hours, 55 offline / 0 online, one playthrough, five story chapters of 60–80 hours.
+  Every guide on this page is written in our own words for this guide; each trophy names its sources beside it, and where
+  no verified method exists yet — five trophies, marked in their guides — we say so rather than inventing steps.</p>
+  <p>Works fully offline: this page loads only its own files and stores your progress in your browser (localStorage).
+  No Rockstar Games logo or official artwork is used anywhere; the look is our own.</p>
+  <p class="fine">Leonida Platinum is an unofficial fan guide. Grand Theft Auto is a trademark of Rockstar Games.</p>
 </footer>
 
 <script type="module" src="./js/main.js"></script>
